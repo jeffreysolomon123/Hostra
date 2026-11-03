@@ -1,0 +1,8 @@
+venv/
+workdir/
+__pycache__/
+
+venv/
+workdir/
+__pycache__/
+*.db
