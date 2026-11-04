@@ -10,10 +10,12 @@ WORKDIR = Path(__file__).resolve().parent.parent / "workdir"
 WORKDIR.mkdir(exist_ok=True)
 
 LABEL = "paas.managed"
+NETWORK = "paas-net"
+DOMAIN = "localhost"
 
 
-def make_slug(owner_id: int, name: str) -> str:
-    return f"{owner_id}-{name}"
+def app_url(owner_id: int, name: str) -> str:
+    return f"http://{name}-{owner_id}.{DOMAIN}"
 
 
 def clone_repo(repo_url: str, slug: str) -> Path:
@@ -37,23 +39,28 @@ def build_image(path: Path, slug: str) -> str:
     return tag
 
 
-def run_container(slug: str, owner_id: int, name: str, tag: str, port: int) -> str:
+def run_container(slug: str, owner_id: int, name: str, tag: str, port: int):
     try:
         client.containers.get(f"paas-{slug}").remove(force=True)
     except docker.errors.NotFound:
         pass
 
-    container = client.containers.run(
+    host = f"{name}-{owner_id}.{DOMAIN}"
+    client.containers.run(
         tag,
         name=f"paas-{slug}",
         detach=True,
-        ports={f"{port}/tcp": None},
-        labels={LABEL: "true", "paas.app": name, "paas.owner": str(owner_id)},
+        network=NETWORK,
+        labels={
+            LABEL: "true",
+            "paas.app": name,
+            "paas.owner": str(owner_id),
+            "traefik.enable": "true",
+            f"traefik.http.routers.{slug}.rule": f"Host(`{host}`)",
+            f"traefik.http.routers.{slug}.entrypoints": "web",
+            f"traefik.http.services.{slug}.loadbalancer.server.port": str(port),
+        },
     )
-    container.reload()
-    ports = container.attrs["NetworkSettings"]["Ports"]
-    return ports[f"{port}/tcp"][0]["HostPort"]
-
 
 def _get(slug: str):
     return client.containers.get(f"paas-{slug}")
@@ -71,12 +78,8 @@ def stop_app(slug: str):
     _get(slug).stop()
 
 
-def start_app(slug: str, port: int) -> str:
-    container = _get(slug)
-    container.start()
-    container.reload()
-    mapping = container.attrs["NetworkSettings"]["Ports"].get(f"{port}/tcp")
-    return mapping[0]["HostPort"]
+def start_app(slug: str):
+    _get(slug).start()
 
 
 def delete_app(slug: str):

@@ -94,7 +94,7 @@ def deploy(
     try:
         path = deployer.clone_repo(req.repo_url, slug)
         tag = deployer.build_image(path, slug)
-        host_port = deployer.run_container(slug, user.id, req.name, tag, req.port)
+        deployer.run_container(slug, user.id, req.name, tag, req.port)
     except subprocess.CalledProcessError as e:
         raise HTTPException(400, f"git clone failed: {e.stderr}")
     except FileNotFoundError as e:
@@ -115,10 +115,9 @@ def deploy(
         db.add(record)
     record.repo_url = req.repo_url
     record.port = req.port
-    record.host_port = int(host_port)
     db.commit()
+    return {"name": req.name, "url": deployer.app_url(user.id, req.name)}
 
-    return {"name": req.name, "url": f"http://localhost:{host_port}"}
 
 
 @app.get("/apps")
@@ -135,7 +134,7 @@ def list_apps(
             "repo_url": r.repo_url,
             "port": r.port,
             "status": deployer.get_status(deployer.make_slug(user.id, r.name)),
-            "url": f"http://localhost:{r.host_port}" if r.host_port else None,
+            "url": deployer.app_url(user.id, r.name),
             "created_at": r.created_at,
         }
         for r in rows
@@ -163,15 +162,12 @@ def start_app(
     user: models.User = Depends(auth.get_current_user),
     db: Session = Depends(get_db),
 ):
-    record = get_app_or_404(db, user, name)
-    slug = deployer.make_slug(user.id, name)
+    get_app_or_404(db, user, name)
     try:
-        host_port = deployer.start_app(slug, record.port)
+        deployer.start_app(deployer.make_slug(user.id, name))
     except docker.errors.NotFound:
         raise HTTPException(404, "Container no longer exists, redeploy the app")
-    record.host_port = int(host_port)
-    db.commit()
-    return {"name": name, "url": f"http://localhost:{host_port}"}
+    return {"name": name, "url": deployer.app_url(user.id, name)}
 
 
 @app.delete("/apps/{name}")
