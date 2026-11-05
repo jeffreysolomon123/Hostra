@@ -14,6 +14,10 @@ NETWORK = "paas-net"
 DOMAIN = "localhost"
 
 
+def make_slug(owner_id: int, name: str) -> str:
+    return f"{owner_id}-{name}"
+
+
 def app_url(owner_id: int, name: str) -> str:
     return f"http://{name}-{owner_id}.{DOMAIN}"
 
@@ -61,6 +65,7 @@ def run_container(slug: str, owner_id: int, name: str, tag: str, port: int):
             f"traefik.http.services.{slug}.loadbalancer.server.port": str(port),
         },
     )
+
 
 def _get(slug: str):
     return client.containers.get(f"paas-{slug}")
