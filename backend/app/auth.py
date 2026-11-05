@@ -1,4 +1,3 @@
-import os
 from datetime import datetime, timedelta, timezone
 
 import bcrypt
@@ -8,10 +7,9 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 
 from . import models
+from .config import SECRET_KEY  # anyone who knows it can forge logins
 from .database import get_db
 
-# In real use, set this as an environment variable. Anyone who knows it can forge logins.
-SECRET_KEY = os.environ.get("PAAS_SECRET_KEY", "dev-only-secret-change-me")
 ALGORITHM = "HS256"
 TOKEN_LIFETIME = timedelta(hours=24)
 

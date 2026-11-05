@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from fastapi.middleware.cors import CORSMiddleware
-from . import auth, collector, deployer, models
+from . import auth, collector, config, deployer, models
 from .database import Base, engine, get_db
 
 Base.metadata.create_all(bind=engine)
@@ -28,7 +28,7 @@ app = FastAPI(title="Mini PaaS", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=[config.FRONTEND_ORIGIN],
     allow_methods=["*"],
     allow_headers=["*"],
 )

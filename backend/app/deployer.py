@@ -4,6 +4,8 @@ from pathlib import Path
 
 import docker
 
+from .config import DOMAIN
+
 client = docker.from_env()
 
 WORKDIR = Path(__file__).resolve().parent.parent / "workdir"
@@ -11,7 +13,6 @@ WORKDIR.mkdir(exist_ok=True)
 
 LABEL = "paas.managed"
 NETWORK = "paas-net"
-DOMAIN = "localhost"
 
 
 def make_slug(owner_id: int, name: str) -> str:

@@ -1,8 +1,18 @@
+# Python
 venv/
-workdir/
 __pycache__/
+*.pyc
 
-venv/
+# Node / build output
+node_modules/
+dist/
+
+# Runtime data: cloned repos and the SQLite database
 workdir/
-__pycache__/
 *.db
+*.db-journal
+
+# Secrets (only .env.example is committed)
+.env
+.env.*
+!.env.example
