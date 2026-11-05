@@ -32,11 +32,14 @@ def log_path(deployment_id: int):
     return LOG_DIR / f"{deployment_id}.log"
 
 
-def read_log(deployment_id: int, max_lines: int = 5000) -> list[str]:
+def read_log(deployment_id: int, max_lines: int = 5000) -> tuple[list[str], int]:
+    """(last max_lines lines, total line count). The total is what the build WebSocket
+    compares with the live line numbers to skip lines it already sent."""
     path = log_path(deployment_id)
     if not path.exists():
-        return []
-    return path.read_text(errors="replace").splitlines()[-max_lines:]
+        return [], 0
+    lines = path.read_text(errors="replace").splitlines()
+    return lines[-max_lines:], len(lines)
 
 
 def publish_status(app: models.App, d: models.Deployment):

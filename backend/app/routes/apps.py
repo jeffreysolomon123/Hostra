@@ -273,7 +273,7 @@ def list_deployments(name: str, user: models.User = Auth, db: Session = Depends(
 @router.get("/deployments/{deployment_id}")
 def get_deployment(deployment_id: int, user: models.User = Auth, db: Session = Depends(get_db)):
     d, app = get_deployment_or_404(db, user, deployment_id)
-    return {**serializers.deployment(d), "app": app.name, "log": worker.read_log(d.id)}
+    return {**serializers.deployment(d), "app": app.name, "log": worker.read_log(d.id)[0]}
 
 
 @router.get("/apps/{name}/webhook")

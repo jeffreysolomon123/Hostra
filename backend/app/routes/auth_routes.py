@@ -42,3 +42,10 @@ def login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get
 @router.get("/me")
 def me(user: models.User = Depends(auth.get_current_user)):
     return {"id": user.id, "email": user.email}
+
+
+@router.post("/ws-ticket")
+def ws_ticket(user: models.User = Depends(auth.get_current_user)):
+    """Exchange the login token for a 30-second, single-use WebSocket ticket."""
+    return {"ticket": auth.create_ws_ticket(user.id),
+            "expires_in": int(auth.WS_TICKET_LIFETIME.total_seconds())}

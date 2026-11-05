@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "./api";
+import { UNAUTHORIZED_EVENT } from "./lib/api";
 import AuthPage from "./AuthPage";
 import Dashboard from "./Dashboard";
 import AppDetail from "./AppDetail";
@@ -21,6 +22,16 @@ export default function App() {
   }
 
   useEffect(loadUser, []);
+
+  // lib/api.js fires this on any 401: the token is gone, so show the login page
+  useEffect(() => {
+    const onUnauthorized = () => {
+      setUser(null);
+      setSelected(null);
+    };
+    window.addEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
+    return () => window.removeEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
+  }, []);
 
   function handleLogin() {
     setChecking(true);

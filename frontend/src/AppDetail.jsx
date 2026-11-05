@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "./api";
 import MetricsCharts from "./MetricsCharts";
+import { useWebSocket } from "./hooks/useWebSocket";
+
+const MAX_LINES = 2000;
 
 const STATUS_COLORS = {
   running: "#16a34a",
@@ -10,35 +13,54 @@ const STATUS_COLORS = {
 
 export default function AppDetail({ name, onBack }) {
   const [app, setApp] = useState(null);
-  const [logs, setLogs] = useState("");
+  const [lines, setLines] = useState([]);
   const [error, setError] = useState("");
   const logRef = useRef(null);
 
-  function load() {
-    api(`/apps/${name}`)
-      .then(setApp)
-      .catch((err) => setError(err.message));
+  // Live logs over WebSocket. On every (re)connect the server resends the last
+  // 200 lines, so start from an empty list to avoid duplicates.
+  const live = useWebSocket(
+    `/ws/apps/${name}/logs`,
+    (msg) => {
+      if (msg.type === "logs") setLines((prev) => [...prev, ...msg.lines].slice(-MAX_LINES));
+      if (msg.type === "detached") setLines((prev) => [...prev, `--- ${msg.message} ---`]);
+    },
+    { onOpen: () => setLines([]) }
+  );
 
-    api(`/apps/${name}/logs?tail=200`)
-      .then((d) => {
-        setLogs(d.logs || "(no output yet)");
+  function loadApp() {
+    api(`/apps/${name}`)
+      .then((a) => {
+        setApp(a);
         setError("");
       })
-      .catch((err) => setLogs(`Could not load logs: ${err.message}`));
+      .catch((err) => setError(err.message));
   }
 
-  // load now, then refresh every 3 seconds
   useEffect(() => {
-    load();
-    const id = setInterval(load, 3000);
+    loadApp();
+    const id = setInterval(loadApp, 5000);
     return () => clearInterval(id);
   }, [name]);
+
+  // REST fallback: while the socket is down, poll the logs instead
+  useEffect(() => {
+    if (live === "live") return undefined;
+    function poll() {
+      api(`/apps/${name}/logs?tail=200`)
+        .then((d) => setLines((d.logs || "").split("\n")))
+        .catch(() => {});
+    }
+    poll();
+    const id = setInterval(poll, 3000);
+    return () => clearInterval(id);
+  }, [name, live]);
 
   // keep the log box scrolled to the newest line
   useEffect(() => {
     const el = logRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [logs]);
+  }, [lines]);
 
   return (
     <div>
@@ -76,9 +98,14 @@ export default function AppDetail({ name, onBack }) {
       )}
         <h3>Usage</h3>
       <MetricsCharts name={name} />
-      <h3>Logs</h3>
+      <h3>
+        Logs{" "}
+        <span style={{ fontSize: 13, fontWeight: 400, color: live === "live" ? "#16a34a" : "#d97706" }}>
+          ● {live === "live" ? "Live" : "Reconnecting…"}
+        </span>
+      </h3>
       <pre ref={logRef} style={styles.logs}>
-        {logs}
+        {lines.length ? lines.join("\n") : "(no output yet)"}
       </pre>
     </div>
   );

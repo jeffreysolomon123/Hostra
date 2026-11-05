@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "./api";
+import { useWebSocket } from "./hooks/useWebSocket";
 
 const STATUS_COLORS = {
   running: "#16a34a",
@@ -30,12 +31,17 @@ export default function Dashboard({ onOpen }) {
       .catch((err) => setError(err.message));
   }
 
-  // load now, then refresh every 5 seconds
+  // Live: any event for this user (status change, deployment, restart) -> refetch.
+  const live = useWebSocket("/ws/events", (msg) => {
+    if (msg.type !== "hello") loadApps();
+  });
+
+  // Fallback polling: every 5s while the socket is down, every 30s as a safety net
   useEffect(() => {
     loadApps();
-    const id = setInterval(loadApps, 5000);
+    const id = setInterval(loadApps, live === "live" ? 30000 : 5000);
     return () => clearInterval(id);
-  }, []);
+  }, [live]);
 
   async function handleDeploy(e) {
     e.preventDefault();
@@ -105,7 +111,12 @@ export default function Dashboard({ onOpen }) {
       </form>
       {deployError && <p style={{ color: "#444" }}>{deployError}</p>}
 
-      <h2>Your apps</h2>
+      <h2>
+        Your apps{" "}
+        <span style={{ fontSize: 13, fontWeight: 400, color: live === "live" ? "#16a34a" : "#d97706" }}>
+          ● {live === "live" ? "Live" : "Reconnecting…"}
+        </span>
+      </h2>
       {error && <p style={{ color: "crimson" }}>{error}</p>}
       {apps.length === 0 && <p style={{ color: "#666" }}>No apps yet. Deploy one above.</p>}
 
