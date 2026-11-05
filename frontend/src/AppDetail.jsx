@@ -15,8 +15,8 @@ export default function AppDetail({ name, onBack }) {
   const logRef = useRef(null);
 
   function load() {
-    api("/apps")
-      .then((list) => setApp(list.find((a) => a.name === name) || null))
+    api(`/apps/${name}`)
+      .then(setApp)
       .catch((err) => setError(err.message));
 
     api(`/apps/${name}/logs?tail=200`)

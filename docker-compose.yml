@@ -4,9 +4,17 @@ services:
     container_name: paas-traefik
     restart: unless-stopped
     command:
+      # Discover apps from Docker container labels (traefik.enable=true opt-in)
       - --providers.docker=true
       - --providers.docker.exposedbydefault=false
+      # Default network for v1 apps without a traefik.docker.network label.
+      # New apps live on per-user networks (paas-user-<id>) that the API connects Traefik to.
       - --providers.docker.network=paas-net
+      # Apply container changes after 200ms instead of 2s, so a removed container
+      # disappears from the routing table quickly during a redeploy swap.
+      - --providers.providersThrottleDuration=200ms
+      # Fail fast on a dead backend IP (default 30s) so the retry middleware can kick in
+      - --serversTransport.forwardingTimeouts.dialTimeout=2s
       - --entrypoints.web.address=:80
       - --api.insecure=true
     ports:

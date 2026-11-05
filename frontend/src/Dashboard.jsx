@@ -3,7 +3,10 @@ import { api } from "./api";
 
 const STATUS_COLORS = {
   running: "#16a34a",
-  exited: "#dc2626",
+  building: "#2563eb",
+  stopped: "#6b7280",
+  crashed: "#dc2626",
+  failed: "#dc2626",
   missing: "#6b7280",
 };
 
@@ -14,7 +17,7 @@ export default function Dashboard({ onOpen }) {
   // deploy form
   const [name, setName] = useState("");
   const [repoUrl, setRepoUrl] = useState("");
-  const [port, setPort] = useState("5000");
+  const [port, setPort] = useState(""); // empty = auto-detect from the Dockerfile EXPOSE
   const [deploying, setDeploying] = useState(false);
   const [deployError, setDeployError] = useState("");
 
@@ -39,15 +42,17 @@ export default function Dashboard({ onOpen }) {
     setDeployError("");
     setDeploying(true);
     try {
-      await api("/deploy", {
+      // returns immediately (202); the build runs in the background
+      const res = await api("/deploy", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name,
           repo_url: repoUrl,
-          port: Number(port),
+          port: port ? Number(port) : null,
         }),
       });
+      setDeployError(`Deployment #${res.deployment_id} queued. The status updates below.`);
       setName("");
       setRepoUrl("");
       loadApps();
@@ -89,22 +94,16 @@ export default function Dashboard({ onOpen }) {
         />
         <input
           type="number"
-          placeholder="Port"
+          placeholder="Port (auto)"
           value={port}
           onChange={(e) => setPort(e.target.value)}
-          required
           style={{ ...styles.input, width: 80, flex: "none" }}
         />
         <button type="submit" disabled={deploying} style={styles.primary}>
           {deploying ? "Deploying..." : "Deploy"}
         </button>
       </form>
-      {deploying && (
-        <p style={{ color: "#666" }}>
-          Building the image. The first build can take a minute or two...
-        </p>
-      )}
-      {deployError && <p style={{ color: "crimson" }}>{deployError}</p>}
+      {deployError && <p style={{ color: "#444" }}>{deployError}</p>}
 
       <h2>Your apps</h2>
       {error && <p style={{ color: "crimson" }}>{error}</p>}

@@ -11,8 +11,13 @@ dist/
 workdir/
 *.db
 *.db-journal
+*.db-wal
+*.db-shm
 
 # Secrets (only .env.example is committed)
 .env
 .env.*
 !.env.example
+
+# Per-deployment build logs
+backend/logs/
