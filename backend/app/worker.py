@@ -107,6 +107,7 @@ def run_deployment(deployment_id: int):
                 d.commit_sha, d.commit_message = sha, subject
                 app.branch = app.branch or branch
                 db.commit()
+                publish_status(app, d)  # the UI shows the commit while it builds
                 line(f"==> Commit {sha[:7]} on {branch}: {subject}")
 
                 port = app.port_override or deployer.detect_port(path)

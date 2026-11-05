@@ -1,77 +1,50 @@
-import { useEffect, useState } from "react";
-import { api } from "./api";
-import { UNAUTHORIZED_EVENT } from "./lib/api";
-import AuthPage from "./AuthPage";
-import Dashboard from "./Dashboard";
-import AppDetail from "./AppDetail";
+import { lazy, Suspense } from "react";
+import { Route, Routes } from "react-router-dom";
+import { AppLayout, ErrorBoundary, ProtectedRoute } from "./components/Layout";
+import { Skeleton } from "./components/ui";
+import AuthPage from "./pages/AuthPage";
+import NewProject from "./pages/NewProject";
+import NotFound from "./pages/NotFound";
+import Projects from "./pages/Projects";
+import DeploymentDetail from "./pages/project/DeploymentDetail";
+import Deployments from "./pages/project/Deployments";
+import Environment from "./pages/project/Environment";
+import Logs from "./pages/project/Logs";
+import Overview from "./pages/project/Overview";
+import ProjectLayout from "./pages/project/ProjectLayout";
+import Settings from "./pages/project/Settings";
+
+// recharts is most of the bundle; only load it when the Metrics tab is opened
+const Metrics = lazy(() => import("./pages/project/Metrics"));
+const metrics = (
+  <Suspense fallback={<Skeleton className="h-64" />}>
+    <Metrics />
+  </Suspense>
+);
+
 export default function App() {
-  const [user, setUser] = useState(null);
-  const [checking, setChecking] = useState(true);
-  const [selected, setSelected] = useState(null);
-
-  // on page load, ask the backend who we are (if a token is saved)
-  function loadUser() {
-    if (!localStorage.getItem("token")) {
-      setChecking(false);
-      return;
-    }
-    api("/auth/me")
-      .then(setUser)
-      .catch(() => localStorage.removeItem("token")) // expired or invalid token
-      .finally(() => setChecking(false));
-  }
-
-  useEffect(loadUser, []);
-
-  // lib/api.js fires this on any 401: the token is gone, so show the login page
-  useEffect(() => {
-    const onUnauthorized = () => {
-      setUser(null);
-      setSelected(null);
-    };
-    window.addEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
-    return () => window.removeEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
-  }, []);
-
-  function handleLogin() {
-    setChecking(true);
-    loadUser();
-  }
-
-    function logout() {
-    localStorage.removeItem("token");
-    setUser(null);
-    setSelected(null);
-  }
-
-  if (checking) return <p style={{ padding: 40 }}>Loading...</p>;
-  if (!user) return <AuthPage onLogin={handleLogin} />;
-
   return (
-    <div style={{ fontFamily: "sans-serif", background: "#f4f5f7", minHeight: "100vh" }}>
-      <header
-        style={{
-          background: "white",
-          padding: "12px 40px",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          boxShadow: "0 1px 4px rgba(0,0,0,0.08)",
-        }}
-      >
-        <strong style={{ fontSize: 20 }}>Hostra</strong>
-        <div>
-          <span style={{ color: "#666", marginRight: 12 }}>{user.email}</span>
-          <button onClick={logout}>Log out</button>
-        </div>
-      </header>
-      <main style={{ maxWidth: 800, margin: "0 auto", padding: 40 }}>
-                {selected ? (
-          <AppDetail name={selected} onBack={() => setSelected(null)} />
-        ) : (
-          <Dashboard onOpen={setSelected} />
-        )}
-      </main>
-    </div>
+    <ErrorBoundary>
+      <Routes>
+        <Route path="/login" element={<AuthPage mode="login" />} />
+        <Route path="/signup" element={<AuthPage mode="signup" />} />
+        <Route element={<ProtectedRoute />}>
+          <Route element={<AppLayout />}>
+            <Route index element={<Projects />} />
+            <Route path="new" element={<NewProject />} />
+            <Route path="projects/:name" element={<ProjectLayout />}>
+              <Route index element={<Overview />} />
+              <Route path="deployments" element={<Deployments />} />
+              <Route path="deployments/:id" element={<DeploymentDetail />} />
+              <Route path="logs" element={<Logs />} />
+              <Route path="metrics" element={metrics} />
+              <Route path="env" element={<Environment />} />
+              <Route path="settings" element={<Settings />} />
+            </Route>
+            <Route path="*" element={<NotFound />} />
+          </Route>
+        </Route>
+      </Routes>
+    </ErrorBoundary>
   );
 }

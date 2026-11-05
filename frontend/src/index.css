@@ -1,3 +1,48 @@
+@import "tailwindcss";
+
+/* Design tokens. Usage: bg-bg, bg-surface, border-line, text-fg, text-muted, ... */
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --color-bg: #0a0a0a;          /* page */
+  --color-surface: #111111;     /* cards */
+  --color-surface-2: #181818;   /* inputs, hovered rows */
+  --color-line: #262626;        /* 1px borders */
+  --color-line-strong: #3a3a3a; /* hovered borders */
+  --color-fg: #ededed;
+  --color-muted: #a1a1a1;
+  --color-faint: #707070;
+
+  /* status (UI state) */
+  --color-ok: #22c55e;
+  --color-warn: #f5a524;
+  --color-err: #ef4444;
+  --color-info: #3b82f6;
+
+  /* chart series (validated for CVD + contrast on the dark surface) */
+  --color-series-1: #3987e5;
+  --color-series-2: #d95926;
+}
+
+:root {
+  color-scheme: dark;
+}
+
 body {
-  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "cv11", "ss01";
+}
+
+/* thin, quiet scrollbars for log panes */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #333 transparent;
+}
+
+::selection {
+  background: rgba(59, 130, 246, 0.35);
 }

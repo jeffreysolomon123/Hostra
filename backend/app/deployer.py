@@ -136,10 +136,10 @@ def build_image(path: Path, slug: str, on_line: Callable[[str], None]) -> str:
                                             forcerm=True, decode=True):
             if "error" in chunk:
                 raise DeployError(f"Docker build failed: {chunk['error'].strip()}")
-            text = chunk.get("stream") or chunk.get("status")
-            if text:
-                for line in text.rstrip("\n").split("\n"):
-                    on_line(line)
+            text = chunk.get("stream") or chunk.get("status") or ""
+            for line in text.split("\n"):
+                if line.strip():  # Docker sends many bare/leading "\n"; skip empty lines
+                    on_line(line.rstrip())
             if time.monotonic() > deadline:
                 raise DeployError(f"Build timed out after {BUILD_TIMEOUT}s")
     except docker.errors.APIError as e:
