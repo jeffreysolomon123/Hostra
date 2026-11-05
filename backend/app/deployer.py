@@ -101,6 +101,28 @@ def clone_repo(repo_url: str, slug: str, branch: str | None) -> Path:
     return dest
 
 
+# Seed-only source: "local:samples/<dir>". The HTTP API never accepts this (it only
+# allows GitHub URLs), so only someone with shell access (python -m app.seed) can
+# create such an app. The folder is copied instead of cloned; the rest of the
+# pipeline (build, run, recovery, metrics) is exactly the same.
+LOCAL_PREFIX = "local:"
+SAMPLES_DIR = Path(__file__).resolve().parent.parent.parent / "samples"
+
+
+def copy_local_source(repo_url: str, slug: str) -> Path:
+    rel = repo_url.removeprefix(LOCAL_PREFIX)
+    src = (SAMPLES_DIR.parent / rel).resolve()
+    if src.parent != SAMPLES_DIR or not src.is_dir():  # only direct children of samples/
+        raise DeployError(f"Unknown local sample: {rel}")
+    dest = WORKDIR / slug
+    if dest.exists():
+        shutil.rmtree(dest)
+    shutil.copytree(src, dest)
+    if not (dest / "Dockerfile").is_file():
+        raise DeployError("No Dockerfile found in the sample")
+    return dest
+
+
 def commit_info(path: Path) -> tuple[str, str, str]:
     """(sha, subject line, branch) of the cloned HEAD."""
     sha, subject = _git(["log", "-1", "--format=%H%n%s"], cwd=path).split("\n", 1)

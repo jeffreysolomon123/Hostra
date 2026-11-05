@@ -1,5 +1,5 @@
 # Run from the repo root inside WSL. (Install make once with: sudo apt install make)
-.PHONY: dev-backend dev-frontend up down seed
+.PHONY: dev-backend dev-frontend up down seed test
 
 # --reload-dir app: only watch our source, not workdir/ (cloned repos) or venv/
 dev-backend:
@@ -17,3 +17,7 @@ down:
 
 seed:
 	cd backend && ./venv/bin/python -m app.seed
+
+# end-to-end tests against the running stack (make up + make dev-backend first)
+test:
+	cd backend && ./venv/bin/python ../tests/e2e_api.py && ./venv/bin/python ../tests/e2e_websockets.py

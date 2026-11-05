@@ -48,13 +48,19 @@ def publish_status(app: models.App, d: models.Deployment):
     events.notify(app.owner_id, payload)        # the dashboard
 
 
-def enqueue(db, app: models.App, trigger: str, commit_sha=None, commit_message=None):
+def create_deployment(db, app: models.App, trigger: str, commit_sha=None, commit_message=None):
     d = models.Deployment(app_id=app.id, status="queued", trigger=trigger,
                           commit_sha=commit_sha, commit_message=commit_message)
     db.add(d)
     db.commit()
     events.record(db, app, "deploy_queued", f"Deployment #{d.id} queued ({trigger})")
     publish_status(app, d)
+    return d
+
+
+def enqueue(db, app: models.App, trigger: str, commit_sha=None, commit_message=None):
+    """Create the row, then hand the id to the worker threads of THIS process."""
+    d = create_deployment(db, app, trigger, commit_sha, commit_message)
     _queue.put(d.id)
     return d
 
@@ -101,14 +107,19 @@ def run_deployment(deployment_id: int):
             db.commit()
             publish_status(app, d)
             try:
-                line(f"==> Cloning {app.repo_url} ({app.branch or 'default branch'})")
-                path = deployer.clone_repo(app.repo_url, slug, app.branch)
-                sha, subject, branch = deployer.commit_info(path)
+                if app.repo_url.startswith(deployer.LOCAL_PREFIX):  # seed samples
+                    line(f"==> Copying {app.repo_url}")
+                    path = deployer.copy_local_source(app.repo_url, slug)
+                    sha, subject = None, "Local sample source"
+                else:
+                    line(f"==> Cloning {app.repo_url} ({app.branch or 'default branch'})")
+                    path = deployer.clone_repo(app.repo_url, slug, app.branch)
+                    sha, subject, branch = deployer.commit_info(path)
+                    app.branch = app.branch or branch
+                    line(f"==> Commit {sha[:7]} on {branch}: {subject}")
                 d.commit_sha, d.commit_message = sha, subject
-                app.branch = app.branch or branch
                 db.commit()
                 publish_status(app, d)  # the UI shows the commit while it builds
-                line(f"==> Commit {sha[:7]} on {branch}: {subject}")
 
                 port = app.port_override or deployer.detect_port(path)
                 source = ("set by you" if app.port_override else
@@ -134,7 +145,7 @@ def run_deployment(deployment_id: int):
                     db.commit()
                 line(f"==> Live at {deployer.app_url(app.owner_id, app.name)}")
                 events.record(db, app, "deploy_live",
-                              f"Deployment #{d.id} is live ({sha[:7]})")
+                              f"Deployment #{d.id} is live ({sha[:7] if sha else 'local'})")
             except deployer.DeployError as e:
                 _fail(db, app, d, str(e), line)
             except Exception as e:  # unexpected: keep the message short, details in the server log
