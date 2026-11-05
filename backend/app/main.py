@@ -1,5 +1,7 @@
 import subprocess
-
+import threading
+from contextlib import asynccontextmanager
+from datetime import datetime, timedelta, timezone
 import docker
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.security import OAuth2PasswordRequestForm
@@ -8,12 +10,20 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from fastapi.middleware.cors import CORSMiddleware
-from . import auth, deployer, models
+from . import auth, collector, deployer, models
 from .database import Base, engine, get_db
 
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="Mini PaaS")
+@asynccontextmanager
+async def lifespan(_app):
+    stop = threading.Event()
+    threading.Thread(target=collector.loop, args=(stop,), daemon=True).start()
+    yield
+    stop.set()
+
+
+app = FastAPI(title="Mini PaaS", lifespan=lifespan)
 
 
 app.add_middleware(
@@ -209,3 +219,38 @@ def app_logs(
         return {"name": name, "logs": deployer.get_logs(slug, tail)}
     except docker.errors.NotFound:
         raise HTTPException(404, "Container no longer exists")
+
+
+@app.get("/apps/{name}/metrics")
+def app_metrics(
+    name: str,
+    minutes: int = 15,
+    user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db),
+):
+    record = get_app_or_404(db, user, name)
+    since = datetime.now(timezone.utc) - timedelta(minutes=min(max(minutes, 1), 60))
+    rows = db.scalars(
+        select(models.Metric)
+        .where(models.Metric.app_id == record.id, models.Metric.created_at >= since)
+        .order_by(models.Metric.created_at)
+    ).all()
+
+    points, prev, prev_t = [], None, None
+    for r in rows:
+        t = int(r.created_at.replace(tzinfo=timezone.utc).timestamp())
+        rx_rate = tx_rate = 0.0
+        if prev is not None and t > prev_t:
+            seconds = t - prev_t
+            # max(...) guards against the counter resetting after a restart
+            rx_rate = max(r.net_rx - prev.net_rx, 0) / seconds
+            tx_rate = max(r.net_tx - prev.net_tx, 0) / seconds
+        points.append({
+            "t": t,
+            "cpu_percent": r.cpu_percent,
+            "mem_mb": round(r.mem_bytes / 1024 / 1024, 1),
+            "rx_kbps": round(rx_rate / 1024, 2),
+            "tx_kbps": round(tx_rate / 1024, 2),
+        })
+        prev, prev_t = r, t
+    return points

@@ -101,3 +101,41 @@ def delete_app(slug: str):
 
 def get_logs(slug: str, tail: int = 100) -> str:
     return _get(slug).logs(tail=tail).decode("utf-8", errors="replace")
+
+
+
+
+
+
+def list_running():
+    """All running containers that this platform created."""
+    return client.containers.list(
+        filters={"label": f"{LABEL}=true", "status": "running"}
+    )
+
+
+def read_stats(container) -> dict:
+    """One snapshot of CPU %, memory and network totals for a container."""
+    s = container.stats(stream=False)
+
+    cpu = s["cpu_stats"]
+    pre = s["precpu_stats"]
+    cpu_delta = cpu["cpu_usage"]["total_usage"] - pre["cpu_usage"].get("total_usage", 0)
+    sys_delta = cpu.get("system_cpu_usage", 0) - pre.get("system_cpu_usage", 0)
+    cpus = cpu.get("online_cpus") or 1
+    cpu_percent = 0.0
+    if sys_delta > 0 and cpu_delta >= 0:
+        cpu_percent = (cpu_delta / sys_delta) * cpus * 100
+
+    mem = s["memory_stats"]
+    stats = mem.get("stats", {})
+    cache = stats.get("inactive_file", stats.get("cache", 0))
+    mem_bytes = max(mem.get("usage", 0) - cache, 0)
+
+    nets = s.get("networks", {})
+    return {
+        "cpu_percent": round(cpu_percent, 2),
+        "mem_bytes": mem_bytes,
+        "net_rx": sum(n["rx_bytes"] for n in nets.values()),
+        "net_tx": sum(n["tx_bytes"] for n in nets.values()),
+    }

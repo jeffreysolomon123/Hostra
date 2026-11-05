@@ -31,6 +31,9 @@ class App(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     owner_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
     name: Mapped[str] = mapped_column(String(32), index=True)
+    metrics: Mapped[list["Metric"]] = relationship(
+        cascade="all, delete-orphan"
+    )
     repo_url: Mapped[str] = mapped_column(String(255))
     port: Mapped[int]
     host_port: Mapped[int | None]
@@ -38,3 +41,17 @@ class App(Base):
     updated_at: Mapped[datetime] = mapped_column(default=_now, onupdate=_now)
 
     owner: Mapped[User] = relationship(back_populates="apps")
+
+
+
+
+class Metric(Base):
+    __tablename__ = "metrics"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    app_id: Mapped[int] = mapped_column(ForeignKey("apps.id"), index=True)
+    created_at: Mapped[datetime] = mapped_column(default=_now, index=True)
+    cpu_percent: Mapped[float]
+    mem_bytes: Mapped[int]
+    net_rx: Mapped[int]  # total bytes received so far
+    net_tx: Mapped[int]  # total bytes sent so far
