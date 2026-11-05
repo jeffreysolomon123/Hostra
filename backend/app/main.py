@@ -7,13 +7,26 @@ from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
-
+from fastapi.middleware.cors import CORSMiddleware
 from . import auth, deployer, models
 from .database import Base, engine, get_db
 
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Mini PaaS")
+
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}
 
 
 # ---------- schemas ----------
