@@ -23,24 +23,8 @@ Hostra clones a repo, builds its Dockerfile, runs it in a resource-limited conta
 
 ## Architecture
 
-```mermaid
-flowchart LR
-    browser["React dashboard"] -- "REST + WebSocket" --> api
-    gh["GitHub webhook"] --> api
-    subgraph host["Laptop: WSL2 + Docker Desktop"]
-        api["FastAPI<br/>build workers · recovery loop · metrics collector"]
-        db[("SQLite")]
-        docker["Docker Engine"]
-        traefik["Traefik<br/>routes by Host header"]
-        apps["User containers<br/>(one network per user)"]
-    end
-    api --> db
-    api -- "build, run, restart, stats" --> docker
-    docker --- apps
-    visitor["Visitor"] --> traefik --> apps
-```
+<img width="1672" height="941" alt="Hostra_ From GitHub to Live URL" src="https://github.com/user-attachments/assets/693da569-6190-4775-ac2b-9dba6b6ec620" />
 
-**Deploy flow:** validate → queue (202) → `git clone` → `docker build` (streamed) → start new container → startup check → swap out old container → `live`
 
 ## Tech stack
 
